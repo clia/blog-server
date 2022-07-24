@@ -1,6 +1,9 @@
-[workspace]
-members = [
-    "blog-server",
-    "distr",
-    "memoria",
-]
+[package]
+name = "blog-server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ntex = { version = "0.5", features = ["tokio", "rustls"] }
+distr = { git = "https://github.com/coca-labs/distr" }
+memoria = { git = "https://github.com/coca-labs/memoria" }
