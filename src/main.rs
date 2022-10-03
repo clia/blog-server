@@ -10,7 +10,7 @@ use ntex_files as fs;
 use rustls::{Certificate, PrivateKey, ServerConfig};
 use rustls_pemfile::{certs, pkcs8_private_keys};
 
-use libdistr::{cert, acme};
+use libdistr::{acme, cert};
 
 #[ntex::main]
 async fn main() -> std::io::Result<()> {
@@ -20,8 +20,17 @@ async fn main() -> std::io::Result<()> {
         let _ = f.write_all(format!("{}", std::process::id()).as_bytes());
     }
 
-    std::env::set_var("RUST_LOG", "ntex=trace");
-    env_logger::init();
+    // std::env::set_var("RUST_LOG", "ntex=trace");
+    // env_logger::init();
+
+    let _guard = clia_tracing_config::build()
+        .filter_level("trace")
+        .with_ansi(true)
+        .to_stdout(false)
+        .directory("./logs")
+        .file_name("blog-server.log")
+        .rolling("daily")
+        .init();
 
     // nginx::read_config();
 
