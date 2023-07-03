@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-ntex = { version = "0.6", features = ["tokio", "rustls"] }
+ntex = { version = "0.7", features = ["tokio", "rustls"] }
 distr = { git = "https://github.com/coca-labs/distr" }
 memoria = { git = "https://github.com/coca-labs/memoria" }
 
@@ -13,8 +13,8 @@ clia-tracing-config = "0"
 # env_logger = "0.9"
 futures = "0.3"
 nginx-config = "0.13"
-ntex-files = { package = "clia-ntex-files-mod", version = "0.2" }
-ntex-session = { package = "clia-ntex-session", version = "0.2" }
+ntex-files = { package = "clia-ntex-files-mod", version = "0.3" }
+ntex-session = { package = "clia-ntex-session", version = "0.3" }
 # openssl = "0.10"
 rustls = "0.20"
 rustls-pemfile = "0.3"
