@@ -4,20 +4,21 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-ntex = { version = "0.7", features = ["tokio", "rustls"] }
-distr = { git = "https://github.com/coca-labs/distr" }
-memoria = { git = "https://github.com/coca-labs/memoria" }
 
 acme-micro = "0.12"
 clia-tracing-config = "0"
+distr = { git = "https://github.com/coca-labs/distr" }
 # env_logger = "0.9"
 futures = "0.3"
+memoria = { git = "https://github.com/coca-labs/memoria" }
 nginx-config = "0.13"
+ntex = { version = "0.7", features = ["tokio", "rustls"] }
 ntex-files = { package = "clia-ntex-files-mod", version = "0.3" }
 ntex-session = { package = "clia-ntex-session", version = "0.3" }
 # openssl = "0.10"
 rustls = "0.21"
 rustls-pemfile = "1"
+salvo = { version = "0.63.0", features = ["acme"] }
 serde = "1"
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
