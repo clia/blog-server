@@ -46,6 +46,7 @@ async fn main() {
         // .directory("letsencrypt", salvo::conn::acme::LETS_ENCRYPT_STAGING)
         .cache_path("temp/letsencrypt")
         .add_domain("bailog.cn")
+        .add_domain("clia.tech")
         .bind()
         .await;
     Server::new(acceptor).serve(router).await;
