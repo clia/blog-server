@@ -22,3 +22,6 @@ salvo = { version = "0.63.0", features = ["acme"] }
 serde = "1"
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
+
+[profile.release]
+panic = "abort"

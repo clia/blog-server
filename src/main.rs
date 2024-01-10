@@ -24,7 +24,7 @@ async fn hello() -> &'static str {
 }
 
 #[tokio::main]
-async fn main0() {
+async fn main() {
     // Write pid process number.
     let pid_file = File::create("blog-server.pid");
     if let Ok(mut f) = pid_file {
@@ -58,7 +58,7 @@ async fn main0() {
 }
 
 #[ntex::main]
-async fn main() -> std::io::Result<()> {
+async fn main0() -> std::io::Result<()> {
     // Write pid process number.
     let pid_file = File::create("blog-server.pid");
     if let Ok(mut f) = pid_file {
