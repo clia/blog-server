@@ -54,7 +54,16 @@ async fn main() {
         .add_domain("clia.tech")
         .bind()
         .await;
-    Server::new(acceptor).serve(router).await;
+
+    let router_http = Router::new().get(hello);
+    let acceptor_http = TcpListener::new("0.0.0.0:80").bind().await;
+
+    // 同时监听 HTTP 和 HTTPS 端口
+    tokio::select! {
+        _ = Server::new(acceptor).serve(router) => {},
+        _ = Server::new(acceptor_http).serve(router_http) => {},
+    }
+    // Server::new(acceptor).serve(router).await;
 }
 
 #[ntex::main]
