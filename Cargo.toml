@@ -18,7 +18,7 @@ ntex-session = { package = "clia-ntex-session", version = "0.3" }
 # openssl = "0.10"
 rustls = "0.21"
 rustls-pemfile = "1"
-salvo = { version = "0.63.0", features = ["acme"] }
+salvo = { git = "https://github.com/salvo-rs/salvo", features = ["acme"] }
 serde = "1"
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
