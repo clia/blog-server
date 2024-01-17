@@ -13,8 +13,10 @@ futures = "0.3"
 memoria = { git = "https://github.com/coca-labs/memoria" }
 nginx-config = "0.13"
 ntex = { version = "0.7", features = ["tokio", "rustls"] }
-ntex-files = { package = "clia-ntex-files-mod", version = "0.3" }
-ntex-session = { package = "clia-ntex-session", version = "0.3" }
+#ntex-files = { package = "clia-ntex-files-mod", version = "0.3" }
+ntex-files = "0.4"
+#ntex-session = { package = "clia-ntex-session", version = "0.3" }
+ntex-session = "0.4"
 # openssl = "0.10"
 rustls = "0.21"
 rustls-pemfile = "1"
