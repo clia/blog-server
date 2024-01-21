@@ -5,22 +5,22 @@ edition = "2021"
 
 [dependencies]
 
-acme-micro = "0.12"
+# acme-micro = "0.12"
 clia-tracing-config = "0"
-distr = { git = "https://github.com/coca-labs/distr" }
+# distr = { git = "https://github.com/coca-labs/distr" }
 # env_logger = "0.9"
-futures = "0.3"
-memoria = { git = "https://github.com/coca-labs/memoria" }
+# futures = "0.3"
+# memoria = { git = "https://github.com/coca-labs/memoria" }
 nginx-config = "0.13"
-ntex = { version = "1.0", features = ["tokio", "rustls"] }
+# ntex = { version = "1.0", features = ["tokio", "rustls"] }
 #ntex-files = { package = "clia-ntex-files-mod", version = "0.3" }
-ntex-files = "0.4"
+# ntex-files = "0.4"
 #ntex-session = { package = "clia-ntex-session", version = "0.3" }
-ntex-session = "0.4"
+# ntex-session = "0.4"
 # openssl = "0.10"
-rustls = "0.21"
-rustls-pemfile = "1"
-salvo = { git = "https://github.com/salvo-rs/salvo", features = ["acme"] }
+# rustls = "0.21"
+# rustls-pemfile = "1"
+salvo = { version = "0.65", features = ["acme"] }
 serde = "1"
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
