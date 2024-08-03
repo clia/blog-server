@@ -10,6 +10,7 @@ use std::io::prelude::*;
 // use rustls::{Certificate, PrivateKey, ServerConfig};
 // use rustls_pemfile::{certs, pkcs8_private_keys};
 use salvo::prelude::*;
+use salvo::serve_static::StaticDir;
 
 // use libdistr::{acme, cert};
 
@@ -45,13 +46,27 @@ async fn main() {
 
     // tracing_subscriber::fmt().init();
 
-    let router = Router::new().get(hello);
+    // let router = Router::new().get(hello);
+    let router = Router::with_path("<*path>").get(
+        StaticDir::new([
+            "static",
+            // "static-dir-list/static/boy",
+            // "static-dir-list/static/girl",
+            // "static/boy",
+            // "static/girl",
+        ])
+        .include_dot_files(false)
+        .defaults("index.html")
+        .auto_list(true),
+    );
+
     let acceptor = TcpListener::new("0.0.0.0:443")
         .acme()
         // .directory("letsencrypt", salvo::conn::acme::LETS_ENCRYPT_STAGING)
         .cache_path("temp/letsencrypt")
-        .add_domain("bailog.cn")
-        .add_domain("clia.tech")
+        .add_domain("clia.cc")
+        // .add_domain("bailog.cn")
+        // .add_domain("clia.tech")
         .bind()
         .await;
 
