@@ -47,18 +47,20 @@ async fn main() {
     // tracing_subscriber::fmt().init();
 
     // let router = Router::new().get(hello);
-    let router = Router::with_path("<*path>").get(
-        StaticDir::new([
-            "static",
-            // "static-dir-list/static/boy",
-            // "static-dir-list/static/girl",
-            // "static/boy",
-            // "static/girl",
-        ])
-        .include_dot_files(false)
-        .defaults("index.html")
-        .auto_list(true),
-    );
+    let router = Router::with_hoop(Compression::new().enable_gzip(CompressionLevel::Minsize))
+        .path("<*path>")
+        .get(
+            StaticDir::new([
+                "static",
+                // "static-dir-list/static/boy",
+                // "static-dir-list/static/girl",
+                // "static/boy",
+                // "static/girl",
+            ])
+            .include_dot_files(false)
+            .defaults("index.html")
+            .auto_list(true),
+        );
 
     let acceptor = TcpListener::new("0.0.0.0:443")
         .acme()
