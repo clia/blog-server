@@ -62,18 +62,18 @@ async fn main() {
             .auto_list(true),
         );
 
-    let acceptor = TcpListener::new("0.0.0.0:443")
+    let acceptor = TcpListener::new("0.0.0.0:3443")
         .acme()
         // .directory("letsencrypt", salvo::conn::acme::LETS_ENCRYPT_STAGING)
         .cache_path("temp/letsencrypt")
-        .add_domain("clia.cc")
+        .add_domain("clia.us.to")
         // .add_domain("bailog.cn")
         // .add_domain("clia.tech")
         .bind()
         .await;
 
     let router_http = Router::new().get(hello);
-    let acceptor_http = TcpListener::new("0.0.0.0:80").bind().await;
+    let acceptor_http = TcpListener::new("0.0.0.0:3180").bind().await;
 
     // 同时监听 HTTP 和 HTTPS 端口
     tokio::select! {
