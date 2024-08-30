@@ -61,14 +61,17 @@ async fn main() {
             .defaults("index.html")
             .auto_list(true),
         );
+    let service = Service::new(router).hoop(ForceHttps::new().https_port(443));
 
-    let acceptor = TcpListener::new("0.0.0.0:3443")
+    let acceptor = TcpListener::new("0.0.0.0:443")
         .acme()
         // .directory("letsencrypt", salvo::conn::acme::LETS_ENCRYPT_STAGING)
         .cache_path("temp/letsencrypt")
-        .add_domain("clia.us.to")
+        .add_domain("clia.cc")
+        // .add_domain("clia.us.to")
         // .add_domain("bailog.cn")
         // .add_domain("clia.tech")
+        .join(TcpListener::new("0.0.0.0:80"))
         .bind()
         .await;
 
@@ -77,7 +80,7 @@ async fn main() {
 
     // 同时监听 HTTP 和 HTTPS 端口
     tokio::select! {
-        _ = Server::new(acceptor).serve(router) => {},
+        _ = Server::new(acceptor).serve(service) => {},
         _ = Server::new(acceptor_http).serve(router_http) => {},
     }
     // Server::new(acceptor).serve(router).await;
