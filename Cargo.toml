@@ -11,7 +11,7 @@ clia-tracing-config = "0"
 # env_logger = "0.9"
 # futures = "0.3"
 # memoria = { git = "https://github.com/coca-labs/memoria" }
-nginx-config = "0.13"
+nginx-config = { package = "clia-nginx-config", version = "0.14" }
 # ntex = { version = "1.0", features = ["tokio", "rustls"] }
 #ntex-files = { package = "clia-ntex-files-mod", version = "0.3" }
 # ntex-files = "0.4"
