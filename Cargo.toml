@@ -20,6 +20,7 @@ nginx-config = { package = "clia-nginx-config", version = "0.14" }
 # openssl = "0.10"
 # rustls = "0.21"
 # rustls-pemfile = "1"
+rustls = { version = "0.23", features = ["aws-lc-rs"] }
 salvo = { version = "0", features = ["acme", "compression", "serve-static", "force-https"] }
 serde = "1"
 reqwest = { version = "0.11", features = ["rustls-tls"] }
