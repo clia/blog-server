@@ -294,6 +294,10 @@ async fn main() {
     // ensure default HTTP port if none specified
     if ports.is_empty() { ports.insert(3180); }
 
+    // 必须在任何使用 rustls 之前调用
+    rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .expect("Failed to initialize crypto provider");
 
     // For each listen port, bind a TcpListener (enable ACME on port 443) and spawn
     // a Server task. This avoids complex generic types from `join()` chaining.
