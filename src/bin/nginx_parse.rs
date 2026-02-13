@@ -15,6 +15,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(main) => {
             // 打印结构化 AST
             println!("Parsed AST:\n{:#?}", main);
+
+            // 提取并打印 Server 信息
+            let servers = blog_server::nginx::extract_servers(&main);
+            println!("\nExtracted servers summary ({}):\n", servers.len());
+            for (i, s) in servers.iter().enumerate() {
+                println!("Server #{}: {:#?}\n", i + 1, s);
+            }
         }
         Err(err) => {
             eprintln!("parse failed: {}", err);
