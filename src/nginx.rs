@@ -1,7 +1,7 @@
 
 /// Lightweight structs that represent server configuration extracted from
 /// nginx-style AST (from `nginx-config` crate).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ListenInfo {
     pub addr: String,    // textual address (ip:port or :port or unix path)
     pub port: Option<u16>,
@@ -9,7 +9,7 @@ pub struct ListenInfo {
     pub default_server: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LocationInfo {
     pub pattern: String,
     pub root: Option<String>,
@@ -17,25 +17,25 @@ pub struct LocationInfo {
     pub proxy_pass: Vec<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ErrorPageInfo {
     pub codes: Vec<u32>,
     pub uri: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AccessLogInfo {
     pub path: String,
     pub format: Option<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ErrorLogInfo {
     pub path: String,
     pub level: Option<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ServerInfo {
     pub listens: Vec<ListenInfo>,
     pub server_names: Vec<String>,
