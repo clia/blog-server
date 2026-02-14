@@ -31,6 +31,18 @@ async fn hello() -> &'static str {
     "Hello world!"
 }
 
+#[handler]
+async fn debug_servers() -> String {
+    if let Some(m) = SERVERS.get() {
+        let mut out = Vec::new();
+        for (k, v) in m.iter() {
+            out.push(format!("{} -> root={:?} locations={:?}", k, v.root, v.locations.iter().map(|l| l.pattern.clone()).collect::<Vec<_>>()));
+        }
+        return out.join("\n");
+    }
+    "<no servers configured>".to_string()
+}
+
 static HTTP_CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
 
 fn guess_mime(path: &str) -> &'static str {
@@ -88,9 +100,13 @@ async fn host_info(req: &mut Request, res: &mut Response) {
     };
 
     let srv = match servers_map.get(host) {
-        Some(s) => s.clone(),
+        Some(s) => {
+            tracing::debug!("matched server for host '{}': {:?}", host, s.server_names);
+            s.clone()
+        }
         None => {
             // unknown Host -> return 404 (no fallback)
+            tracing::warn!("no server matched for host '{}'", host);
             res.status_code(salvo::http::StatusCode::NOT_FOUND);
             return;
         }
@@ -99,6 +115,7 @@ async fn host_info(req: &mut Request, res: &mut Response) {
     // get the raw path from route param (router uses "<*path>")
     let param_path = req.param::<String>("path").unwrap_or_default();
     let req_path = if param_path.is_empty() { "/".to_string() } else { format!("/{}", param_path) };
+    tracing::debug!("request path: '{}' (param_path: '{}')", req_path, param_path);
 
     // find best matching location (order: exact -> prefix (longest) -> regex)
     let mut exact: Option<&nginx::LocationInfo> = None;
@@ -127,6 +144,14 @@ async fn host_info(req: &mut Request, res: &mut Response) {
     }
 
     let matched_loc = exact.or(best_prefix).or_else(|| regex_match.as_ref().map(|(l, _)| *l));
+    
+    tracing::debug!("location match result: exact={}, prefix={}, regex={}", 
+        exact.is_some(), best_prefix.is_some(), regex_match.is_some());
+    if let Some(loc) = matched_loc {
+        tracing::debug!("matched location pattern: '{}'", loc.pattern);
+    } else {
+        tracing::debug!("no location matched, using server-level config");
+    }
 
     // determine action: proxy_pass (location first, then server-wide), else static file from (location.root || server.root)
     if let Some(loc) = matched_loc {
@@ -195,17 +220,35 @@ async fn host_info(req: &mut Request, res: &mut Response) {
 
         // no proxy_pass -> try to serve static from location.root or server.root
         if let Some(root) = loc.root.as_ref().or_else(|| srv.root.as_ref()) {
+            tracing::debug!("using root: '{}'", root);
             let fs_path = if req_path == "/" {
                 // check index files
                 let mut found = None;
+                tracing::debug!("searching for index files in location.index={:?}, server.index={:?}", 
+                    loc.index, srv.index);
                 for idx in loc.index.iter().chain(srv.index.iter()) {
                     let p = format!("{}/{}", root.trim_end_matches('/'), idx);
-                    if std::path::Path::new(&p).is_file() { found = Some(p); break; }
+                    tracing::debug!("checking index file: '{}'", p);
+                    if std::path::Path::new(&p).is_file() { 
+                        tracing::info!("found index file: '{}'", p);
+                        found = Some(p); 
+                        break; 
+                    }
+                }
+                if found.is_none() {
+                    tracing::warn!("no index file found in root '{}'", root);
                 }
                 found
             } else {
                 let p = format!("{}{}", root.trim_end_matches('/'), req_path);
-                if std::path::Path::new(&p).is_file() { Some(p) } else { None }
+                tracing::debug!("checking direct file path: '{}'", p);
+                if std::path::Path::new(&p).is_file() { 
+                    tracing::info!("found file: '{}'", p);
+                    Some(p) 
+                } else { 
+                    tracing::warn!("file not found: '{}'", p);
+                    None 
+                }
             };
 
             if let Some(p) = fs_path {
@@ -225,16 +268,33 @@ async fn host_info(req: &mut Request, res: &mut Response) {
     } else {
         // no matching location; try server root
         if let Some(root) = srv.root.as_ref() {
+            tracing::debug!("no location matched, using server root: '{}'", root);
             let fs_path = if req_path == "/" {
                 let mut found = None;
+                tracing::debug!("searching for index files in server.index={:?}", srv.index);
                 for idx in srv.index.iter() {
                     let p = format!("{}/{}", root.trim_end_matches('/'), idx);
-                    if std::path::Path::new(&p).is_file() { found = Some(p); break; }
+                    tracing::debug!("checking server-level index file: '{}'", p);
+                    if std::path::Path::new(&p).is_file() { 
+                        tracing::info!("found server-level index file: '{}'", p);
+                        found = Some(p); 
+                        break; 
+                    }
+                }
+                if found.is_none() {
+                    tracing::warn!("no server-level index file found in root '{}'", root);
                 }
                 found
             } else {
                 let p = format!("{}{}", root.trim_end_matches('/'), req_path);
-                if std::path::Path::new(&p).is_file() { Some(p) } else { None }
+                tracing::debug!("checking server-level direct file path: '{}'", p);
+                if std::path::Path::new(&p).is_file() { 
+                    tracing::info!("found server-level file: '{}'", p);
+                    Some(p) 
+                } else { 
+                    tracing::warn!("server-level file not found: '{}'", p);
+                    None 
+                }
             };
 
             if let Some(p) = fs_path {
@@ -306,6 +366,11 @@ async fn main() {
         }
     }
     SERVERS.set(Arc::new(map)).ok();
+    // startup diagnostic: log configured server names
+    if let Some(sm) = SERVERS.get() {
+        let names: Vec<String> = sm.keys().cloned().collect();
+        tracing::info!("configured server_names: {:?}", names);
+    }
 
     // collect all listen ports to bind
     use std::collections::BTreeSet;
@@ -331,8 +396,15 @@ async fn main() {
     for p in ports {
         // recreate router per task (Router is cheap here)
         let r = Router::with_hoop(Compression::new().enable_gzip(CompressionLevel::Minsize))
-            .path("<*path>")
-            .get(host_info);
+            .push(Router::with_path("/__debug/servers").get(debug_servers))
+            .push(Router::with_path("/hello").get(hello))
+            .get(host_info)
+            .post(host_info)
+            .put(host_info)
+            .delete(host_info)
+            .head(host_info)
+            .options(host_info)
+            .patch(host_info);
 
         let task = tokio::spawn(async move {
             if p == 443 {
