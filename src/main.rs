@@ -72,9 +72,11 @@ async fn host_info(req: &mut Request, res: &mut Response) {
     let _ = HTTP_CLIENT.get_or_init(|| reqwest::Client::new());
 
     // Host header -> server lookup
+    // Accept both HTTP/1.1 `Host` and HTTP/2/3 pseudo-header `:authority` (browsers send `:authority`).
     let host = req
         .headers()
         .get("host")
+        .or_else(|| req.headers().get(":authority"))
         .and_then(|v| v.to_str().ok())
         .and_then(|s| s.split(':').next())
         .unwrap_or("");
