@@ -79,9 +79,16 @@ async fn host_info(req: &mut Request, res: &mut Response) {
         .and_then(|s| s.split(':').next())
         .unwrap_or("");
 
-    let srv = match SERVERS.get().and_then(|m| m.get(host)) {
+    // lookup by Host header; do NOT fallback to another server when host is missing
+    let servers_map = match SERVERS.get() {
+        Some(m) => m,
+        None => { res.status_code(salvo::http::StatusCode::NOT_FOUND); return; }
+    };
+
+    let srv = match servers_map.get(host) {
         Some(s) => s.clone(),
         None => {
+            // unknown Host -> return 404 (no fallback)
             res.status_code(salvo::http::StatusCode::NOT_FOUND);
             return;
         }
@@ -268,7 +275,24 @@ async fn main() {
     // Parse distr.conf via nginx-config + our extractor
     let cfg = std::fs::read_to_string("distr.conf").expect("distr.conf not found");
     let main = nginx_config::parse_main(&cfg).expect("failed to parse distr.conf");
-    let servers = blog_server::nginx::extract_servers(&main);
+    let mut servers = blog_server::nginx::extract_servers(&main);
+
+    // validate `root` paths — do NOT fallback to ./static; missing files should return 404
+    for s in servers.iter_mut() {
+        if let Some(root_path) = s.root.as_ref() {
+            if !std::path::Path::new(root_path).exists() {
+                tracing::warn!("configured root '{}' for server {:?} does not exist; requests will return 404", root_path, s.server_names);
+            }
+        }
+
+        for loc in s.locations.iter_mut() {
+            if let Some(lroot) = loc.root.as_ref() {
+                if !std::path::Path::new(lroot).exists() {
+                    tracing::warn!("location root '{}' for pattern '{}' (server {:?}) does not exist; requests will return 404", lroot, loc.pattern, s.server_names);
+                }
+            }
+        }
+    }
 
     // build lookup map by server_name (exact matches only)
     let mut map = HashMap::new();
