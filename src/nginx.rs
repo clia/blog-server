@@ -1,9 +1,8 @@
-
 /// Lightweight structs that represent server configuration extracted from
 /// nginx-style AST (from `nginx-config` crate).
 #[derive(Debug, Clone)]
 pub struct ListenInfo {
-    pub addr: String,    // textual address (ip:port or :port or unix path)
+    pub addr: String, // textual address (ip:port or :port or unix path)
     pub port: Option<u16>,
     pub ssl: bool,
     pub default_server: bool,
@@ -151,9 +150,15 @@ pub fn extract_servers(main: &nginx_config::ast::Main) -> Vec<ServerInfo> {
                                     pattern: match &loc.pattern {
                                         nginx_config::ast::LocationPattern::Prefix(p) => p.clone(),
                                         nginx_config::ast::LocationPattern::Exact(p) => p.clone(),
-                                        nginx_config::ast::LocationPattern::FinalPrefix(p) => p.clone(),
-                                        nginx_config::ast::LocationPattern::Regex(p) => format!("~{}", p),
-                                        nginx_config::ast::LocationPattern::RegexInsensitive(p) => format!("~*{}", p),
+                                        nginx_config::ast::LocationPattern::FinalPrefix(p) => {
+                                            p.clone()
+                                        }
+                                        nginx_config::ast::LocationPattern::Regex(p) => {
+                                            format!("~{}", p)
+                                        }
+                                        nginx_config::ast::LocationPattern::RegexInsensitive(p) => {
+                                            format!("~*{}", p)
+                                        }
                                         nginx_config::ast::LocationPattern::Named(n) => n.clone(),
                                     },
                                     root: None,
@@ -184,28 +189,31 @@ pub fn extract_servers(main: &nginx_config::ast::Main) -> Vec<ServerInfo> {
                             }
 
                             /* additional fields requested */
-                            Item::AccessLog(al) => {
-                                match al {
-                                    nginx_config::ast::AccessLog::Off => { info.access_log = None; }
-                                    nginx_config::ast::AccessLog::On(opts) => {
-                                        let path = value_to_string(&opts.path);
-                                        let fmt = opts.format.clone();
-                                        info.access_log = Some(AccessLogInfo { path, format: fmt });
-                                    }
+                            Item::AccessLog(al) => match al {
+                                nginx_config::ast::AccessLog::Off => {
+                                    info.access_log = None;
                                 }
-                            }
+                                nginx_config::ast::AccessLog::On(opts) => {
+                                    let path = value_to_string(&opts.path);
+                                    let fmt = opts.format.clone();
+                                    info.access_log = Some(AccessLogInfo { path, format: fmt });
+                                }
+                            },
                             Item::ErrorLog { file, level } => {
                                 let path = value_to_string(file);
-                                let lvl = level.as_ref().map(|l| match l {
-                                    nginx_config::ast::ErrorLevel::Debug => "debug",
-                                    nginx_config::ast::ErrorLevel::Info => "info",
-                                    nginx_config::ast::ErrorLevel::Notice => "notice",
-                                    nginx_config::ast::ErrorLevel::Warn => "warn",
-                                    nginx_config::ast::ErrorLevel::Error => "error",
-                                    nginx_config::ast::ErrorLevel::Crit => "crit",
-                                    nginx_config::ast::ErrorLevel::Alert => "alert",
-                                    nginx_config::ast::ErrorLevel::Emerg => "emerg",
-                                }.to_string());
+                                let lvl = level.as_ref().map(|l| {
+                                    match l {
+                                        nginx_config::ast::ErrorLevel::Debug => "debug",
+                                        nginx_config::ast::ErrorLevel::Info => "info",
+                                        nginx_config::ast::ErrorLevel::Notice => "notice",
+                                        nginx_config::ast::ErrorLevel::Warn => "warn",
+                                        nginx_config::ast::ErrorLevel::Error => "error",
+                                        nginx_config::ast::ErrorLevel::Crit => "crit",
+                                        nginx_config::ast::ErrorLevel::Alert => "alert",
+                                        nginx_config::ast::ErrorLevel::Emerg => "emerg",
+                                    }
+                                    .to_string()
+                                });
                                 info.error_log = Some(ErrorLogInfo { path, level: lvl });
                             }
                             Item::SslCertificate(val) => {

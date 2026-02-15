@@ -43,7 +43,10 @@ async fn debug_servers() -> String {
                 k,
                 v.root,
                 v.default_server,
-                v.locations.iter().map(|l| l.pattern.clone()).collect::<Vec<_>>()
+                v.locations
+                    .iter()
+                    .map(|l| l.pattern.clone())
+                    .collect::<Vec<_>>()
             ));
         }
         return out.join("\n");
@@ -104,7 +107,10 @@ async fn host_info(req: &mut Request, res: &mut Response) {
     // lookup by Host header; do NOT fallback to another server when host is missing
     let servers_map = match SERVERS.get() {
         Some(m) => m,
-        None => { res.status_code(salvo::http::StatusCode::NOT_FOUND); return; }
+        None => {
+            res.status_code(salvo::http::StatusCode::NOT_FOUND);
+            return;
+        }
     };
 
     let srv = match servers_map.get(host) {
@@ -123,15 +129,25 @@ async fn host_info(req: &mut Request, res: &mut Response) {
             // try default_server fallback (if configured)
             if let Some(def_name) = DEFAULT_SERVER.get() {
                 if let Some(def_srv) = servers_map.get(def_name.as_str()) {
-                    tracing::info!("no server matched for host '{}', falling back to default_server '{}'", host, def_name);
+                    tracing::info!(
+                        "no server matched for host '{}', falling back to default_server '{}'",
+                        host,
+                        def_name
+                    );
                     def_srv.clone()
                 } else {
-                    tracing::warn!("default_server '{}' configured but not found in SERVERS map", def_name);
+                    tracing::warn!(
+                        "default_server '{}' configured but not found in SERVERS map",
+                        def_name
+                    );
                     res.status_code(salvo::http::StatusCode::NOT_FOUND);
                     return;
                 }
             } else {
-                tracing::warn!("no server matched for host '{}' and no default_server configured", host);
+                tracing::warn!(
+                    "no server matched for host '{}' and no default_server configured",
+                    host
+                );
                 res.status_code(salvo::http::StatusCode::NOT_FOUND);
                 return;
             }
@@ -140,8 +156,16 @@ async fn host_info(req: &mut Request, res: &mut Response) {
 
     // get the raw path from route param (router uses "<*path>")
     let param_path = req.param::<String>("path").unwrap_or_default();
-    let req_path = if param_path.is_empty() { "/".to_string() } else { format!("/{}", param_path) };
-    tracing::debug!("request path: '{}' (param_path: '{}')", req_path, param_path);
+    let req_path = if param_path.is_empty() {
+        "/".to_string()
+    } else {
+        format!("/{}", param_path)
+    };
+    tracing::debug!(
+        "request path: '{}' (param_path: '{}')",
+        req_path,
+        param_path
+    );
 
     // find best matching location (order: exact -> prefix (longest) -> regex)
     let mut exact: Option<&nginx::LocationInfo> = None;
@@ -169,10 +193,16 @@ async fn host_info(req: &mut Request, res: &mut Response) {
         }
     }
 
-    let matched_loc = exact.or(best_prefix).or_else(|| regex_match.as_ref().map(|(l, _)| *l));
-    
-    tracing::debug!("location match result: exact={}, prefix={}, regex={}", 
-        exact.is_some(), best_prefix.is_some(), regex_match.is_some());
+    let matched_loc = exact
+        .or(best_prefix)
+        .or_else(|| regex_match.as_ref().map(|(l, _)| *l));
+
+    tracing::debug!(
+        "location match result: exact={}, prefix={}, regex={}",
+        exact.is_some(),
+        best_prefix.is_some(),
+        regex_match.is_some()
+    );
     if let Some(loc) = matched_loc {
         tracing::debug!("matched location pattern: '{}'", loc.pattern);
     } else {
@@ -189,7 +219,9 @@ async fn host_info(req: &mut Request, res: &mut Response) {
             // compute path to append: request path minus location pattern when location is prefix
             let suffix = if req_path.starts_with(&loc.pattern) {
                 &req_path[loc.pattern.len()..]
-            } else { &req_path };
+            } else {
+                &req_path
+            };
             let upstream_url = format!("{}{}", upstream_base, suffix);
 
             // only forwarding GET/HEAD for now
@@ -199,15 +231,27 @@ async fn host_info(req: &mut Request, res: &mut Response) {
                 return;
             }
 
-            let mut builder = client.request(method.parse().unwrap_or(reqwest::Method::GET), &upstream_url);
+            let mut builder = client.request(
+                method.parse().unwrap_or(reqwest::Method::GET),
+                &upstream_url,
+            );
 
             // copy headers except hop-by-hop
             for (name, value) in req.headers().iter() {
                 let name_str = name.as_str();
                 match name_str {
-                    "connection" | "keep-alive" | "proxy-authorization" | "proxy-authenticate" | "te" | "trailers" | "transfer-encoding" | "upgrade" => continue,
+                    "connection"
+                    | "keep-alive"
+                    | "proxy-authorization"
+                    | "proxy-authenticate"
+                    | "te"
+                    | "trailers"
+                    | "transfer-encoding"
+                    | "upgrade" => continue,
                     _ => {
-                        if let Ok(v) = value.to_str() { builder = builder.header(name_str, v); }
+                        if let Ok(v) = value.to_str() {
+                            builder = builder.header(name_str, v);
+                        }
                     }
                 }
             }
@@ -219,17 +263,26 @@ async fn host_info(req: &mut Request, res: &mut Response) {
                     let bytes = up_resp.bytes().await.unwrap_or_default();
 
                     // set status
-                    res.status_code(salvo::http::StatusCode::from_u16(status.as_u16()).unwrap_or(salvo::http::StatusCode::OK));
+                    res.status_code(
+                        salvo::http::StatusCode::from_u16(status.as_u16())
+                            .unwrap_or(salvo::http::StatusCode::OK),
+                    );
 
                     // copy a few safe headers (content-type, cache-control)
                     if let Some(ct) = headers.get(reqwest::header::CONTENT_TYPE) {
                         if let Ok(s) = ct.to_str() {
-                            let _ = res.headers_mut().insert(salvo::http::header::CONTENT_TYPE, salvo::http::HeaderValue::from_str(s).unwrap());
+                            let _ = res.headers_mut().insert(
+                                salvo::http::header::CONTENT_TYPE,
+                                salvo::http::HeaderValue::from_str(s).unwrap(),
+                            );
                         }
                     }
                     if let Some(cc) = headers.get(reqwest::header::CACHE_CONTROL) {
                         if let Ok(s) = cc.to_str() {
-                            let _ = res.headers_mut().insert(salvo::http::header::CACHE_CONTROL, salvo::http::HeaderValue::from_str(s).unwrap());
+                            let _ = res.headers_mut().insert(
+                                salvo::http::header::CACHE_CONTROL,
+                                salvo::http::HeaderValue::from_str(s).unwrap(),
+                            );
                         }
                     }
                     // write body
@@ -250,15 +303,18 @@ async fn host_info(req: &mut Request, res: &mut Response) {
             let fs_path = if req_path == "/" {
                 // check index files
                 let mut found = None;
-                tracing::debug!("searching for index files in location.index={:?}, server.index={:?}", 
-                    loc.index, srv.index);
+                tracing::debug!(
+                    "searching for index files in location.index={:?}, server.index={:?}",
+                    loc.index,
+                    srv.index
+                );
                 for idx in loc.index.iter().chain(srv.index.iter()) {
                     let p = format!("{}/{}", root.trim_end_matches('/'), idx);
                     tracing::debug!("checking index file: '{}'", p);
-                    if std::path::Path::new(&p).is_file() { 
+                    if std::path::Path::new(&p).is_file() {
                         tracing::info!("found index file: '{}'", p);
-                        found = Some(p); 
-                        break; 
+                        found = Some(p);
+                        break;
                     }
                 }
                 if found.is_none() {
@@ -268,19 +324,22 @@ async fn host_info(req: &mut Request, res: &mut Response) {
             } else {
                 let p = format!("{}{}", root.trim_end_matches('/'), req_path);
                 tracing::debug!("checking direct file path: '{}'", p);
-                if std::path::Path::new(&p).is_file() { 
+                if std::path::Path::new(&p).is_file() {
                     tracing::info!("found file: '{}'", p);
-                    Some(p) 
-                } else { 
+                    Some(p)
+                } else {
                     tracing::warn!("file not found: '{}'", p);
-                    None 
+                    None
                 }
             };
 
             if let Some(p) = fs_path {
                 match std::fs::read(&p) {
                     Ok(bytes) => {
-                        res.headers_mut().insert(salvo::http::header::CONTENT_TYPE, salvo::http::HeaderValue::from_str(guess_mime(&p)).unwrap());
+                        res.headers_mut().insert(
+                            salvo::http::header::CONTENT_TYPE,
+                            salvo::http::HeaderValue::from_str(guess_mime(&p)).unwrap(),
+                        );
                         res.body(bytes);
                         return;
                     }
@@ -301,10 +360,10 @@ async fn host_info(req: &mut Request, res: &mut Response) {
                 for idx in srv.index.iter() {
                     let p = format!("{}/{}", root.trim_end_matches('/'), idx);
                     tracing::debug!("checking server-level index file: '{}'", p);
-                    if std::path::Path::new(&p).is_file() { 
+                    if std::path::Path::new(&p).is_file() {
                         tracing::info!("found server-level index file: '{}'", p);
-                        found = Some(p); 
-                        break; 
+                        found = Some(p);
+                        break;
                     }
                 }
                 if found.is_none() {
@@ -314,19 +373,22 @@ async fn host_info(req: &mut Request, res: &mut Response) {
             } else {
                 let p = format!("{}{}", root.trim_end_matches('/'), req_path);
                 tracing::debug!("checking server-level direct file path: '{}'", p);
-                if std::path::Path::new(&p).is_file() { 
+                if std::path::Path::new(&p).is_file() {
                     tracing::info!("found server-level file: '{}'", p);
-                    Some(p) 
-                } else { 
+                    Some(p)
+                } else {
                     tracing::warn!("server-level file not found: '{}'", p);
-                    None 
+                    None
                 }
             };
 
             if let Some(p) = fs_path {
                 match std::fs::read(&p) {
                     Ok(bytes) => {
-                        res.headers_mut().insert(salvo::http::header::CONTENT_TYPE, salvo::http::HeaderValue::from_str(guess_mime(&p)).unwrap());
+                        res.headers_mut().insert(
+                            salvo::http::header::CONTENT_TYPE,
+                            salvo::http::HeaderValue::from_str(guess_mime(&p)).unwrap(),
+                        );
                         res.body(bytes);
                         return;
                     }
@@ -369,7 +431,11 @@ async fn main() {
     for s in servers.iter_mut() {
         if let Some(root_path) = s.root.as_ref() {
             if !std::path::Path::new(root_path).exists() {
-                tracing::warn!("configured root '{}' for server {:?} does not exist; requests will return 404", root_path, s.server_names);
+                tracing::warn!(
+                    "configured root '{}' for server {:?} does not exist; requests will return 404",
+                    root_path,
+                    s.server_names
+                );
             }
         }
 
@@ -422,12 +488,16 @@ async fn main() {
     if let Some(m) = SERVERS.get() {
         for (_k, v) in m.iter() {
             for l in &v.listens {
-                if let Some(p) = l.port { ports.insert(p); }
+                if let Some(p) = l.port {
+                    ports.insert(p);
+                }
             }
         }
     }
     // ensure default HTTP port if none specified
-    if ports.is_empty() { ports.insert(3180); }
+    if ports.is_empty() {
+        ports.insert(3180);
+    }
 
     // 必须在任何使用 rustls 之前调用
     rustls::crypto::aws_lc_rs::default_provider()
@@ -442,17 +512,23 @@ async fn main() {
         let r = Router::with_hoop(Compression::new().enable_gzip(CompressionLevel::Minsize))
             .push(Router::with_path("/__debug/servers").get(debug_servers))
             .push(Router::with_path("/hello").get(hello))
-            .get(host_info)
-            .post(host_info)
-            .put(host_info)
-            .delete(host_info)
-            .head(host_info)
-            .options(host_info)
-            .patch(host_info);
+            .push(
+                Router::new()
+                    .path("/<**path>")
+                    .get(host_info)
+                    .post(host_info)
+                    .put(host_info)
+                    .delete(host_info)
+                    .head(host_info)
+                    .options(host_info)
+                    .patch(host_info),
+            );
 
         let task = tokio::spawn(async move {
             if p == 443 {
-                let mut b = TcpListener::new(format!("0.0.0.0:{}", p)).acme().cache_path("temp/letsencrypt");
+                let mut b = TcpListener::new(format!("0.0.0.0:{}", p))
+                    .acme()
+                    .cache_path("temp/letsencrypt");
                 if let Some(m) = SERVERS.get() {
                     for name in m.keys() {
                         b = b.add_domain(name.clone());
@@ -473,7 +549,6 @@ async fn main() {
         let _ = t.await;
     }
 }
-
 
 // #[ntex::main]
 // async fn main0() -> std::io::Result<()> {
