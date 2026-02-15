@@ -44,6 +44,9 @@ pub struct ServerInfo {
     pub locations: Vec<LocationInfo>,
     pub error_pages: Vec<ErrorPageInfo>,
 
+    // indicates this server was marked `default_server` on at least one `listen`
+    pub default_server: bool,
+
     // additional fields
     pub access_log: Option<AccessLogInfo>,
     pub error_log: Option<ErrorLogInfo>,
@@ -63,6 +66,7 @@ impl ServerInfo {
             index: Vec::new(),
             locations: Vec::new(),
             error_pages: Vec::new(),
+            default_server: false,
             access_log: None,
             error_log: None,
             ssl_certificate: None,
@@ -124,6 +128,10 @@ pub fn extract_servers(main: &nginx_config::ast::Main) -> Vec<ServerInfo> {
                                     ssl: lst.ssl,
                                     default_server: lst.default_server,
                                 });
+                                // if any listen is marked `default_server`, mark the server
+                                if lst.default_server {
+                                    info.default_server = true;
+                                }
                             }
                             Item::ServerName(names) => {
                                 for n in names {

@@ -36,7 +36,13 @@ async fn debug_servers() -> String {
     if let Some(m) = SERVERS.get() {
         let mut out = Vec::new();
         for (k, v) in m.iter() {
-            out.push(format!("{} -> root={:?} locations={:?}", k, v.root, v.locations.iter().map(|l| l.pattern.clone()).collect::<Vec<_>>()));
+            out.push(format!(
+                "{} -> root={:?} default_server={} locations={:?}",
+                k,
+                v.root,
+                v.default_server,
+                v.locations.iter().map(|l| l.pattern.clone()).collect::<Vec<_>>()
+            ));
         }
         return out.join("\n");
     }
