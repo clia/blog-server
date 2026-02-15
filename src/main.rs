@@ -25,6 +25,8 @@ use blog_server::nginx;
 // }
 
 static SERVERS: OnceLock<Arc<HashMap<String, nginx::ServerInfo>>> = OnceLock::new();
+// name of the server marked `default_server` (if any)
+static DEFAULT_SERVER: OnceLock<String> = OnceLock::new();
 
 #[handler]
 async fn hello() -> &'static str {
@@ -111,10 +113,28 @@ async fn host_info(req: &mut Request, res: &mut Response) {
             s.clone()
         }
         None => {
-            // unknown Host -> return 404 (no fallback)
-            tracing::warn!("no server matched for host '{}'", host);
-            res.status_code(salvo::http::StatusCode::NOT_FOUND);
-            return;
+            // If Host header is missing, keep previous behaviour (return 404)
+            if host.is_empty() {
+                tracing::warn!("missing Host header; returning 404");
+                res.status_code(salvo::http::StatusCode::NOT_FOUND);
+                return;
+            }
+
+            // try default_server fallback (if configured)
+            if let Some(def_name) = DEFAULT_SERVER.get() {
+                if let Some(def_srv) = servers_map.get(def_name.as_str()) {
+                    tracing::info!("no server matched for host '{}', falling back to default_server '{}'", host, def_name);
+                    def_srv.clone()
+                } else {
+                    tracing::warn!("default_server '{}' configured but not found in SERVERS map", def_name);
+                    res.status_code(salvo::http::StatusCode::NOT_FOUND);
+                    return;
+                }
+            } else {
+                tracing::warn!("no server matched for host '{}' and no default_server configured", host);
+                res.status_code(salvo::http::StatusCode::NOT_FOUND);
+                return;
+            }
         }
     };
 
@@ -362,6 +382,17 @@ async fn main() {
         }
     }
 
+    // determine configured default_server (pick first server that has `default_server` on any listen)
+    let mut configured_default: Option<String> = None;
+    for s in &servers {
+        if s.default_server {
+            if let Some(name) = s.server_names.first() {
+                configured_default = Some(name.trim_start_matches("~").to_string());
+                break;
+            }
+        }
+    }
+
     // build lookup map by server_name (exact matches only)
     let mut map = HashMap::new();
     for s in servers.into_iter() {
@@ -372,6 +403,13 @@ async fn main() {
         }
     }
     SERVERS.set(Arc::new(map)).ok();
+
+    // publish default server (if any)
+    if let Some(dn) = configured_default {
+        DEFAULT_SERVER.set(dn.clone()).ok();
+        tracing::info!("configured default_server: {}", dn);
+    }
+
     // startup diagnostic: log configured server names
     if let Some(sm) = SERVERS.get() {
         let names: Vec<String> = sm.keys().cloned().collect();
