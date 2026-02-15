@@ -154,18 +154,9 @@ async fn host_info(req: &mut Request, res: &mut Response) {
         }
     };
 
-    // get the raw path from route param (router uses "<*path>")
-    let param_path = req.param::<String>("path").unwrap_or_default();
-    let req_path = if param_path.is_empty() {
-        "/".to_string()
-    } else {
-        format!("/{}", param_path)
-    };
-    tracing::debug!(
-        "request path: '{}' (param_path: '{}')",
-        req_path,
-        param_path
-    );
+    // Get request path directly from URI - don't rely on route parameters
+    let req_path = req.uri().path().to_string();
+    tracing::debug!("request path: '{}'", req_path);
 
     // find best matching location (order: exact -> prefix (longest) -> regex)
     let mut exact: Option<&nginx::LocationInfo> = None;
@@ -508,32 +499,88 @@ async fn main() {
     // a Server task. This avoids complex generic types from `join()` chaining.
     let mut tasks = Vec::new();
     for p in ports {
-        // recreate router per task (Router is cheap here)
-        let r = Router::with_hoop(Compression::new().enable_gzip(CompressionLevel::Minsize))
-            .push(Router::with_path("/__debug/servers").get(debug_servers))
-            .push(Router::with_path("/hello").get(hello))
-            // explicit root handler — ensure GET/HEAD on "/" are handled by host_info
-            .push(Router::new()
-                .path("/")
-                .get(host_info)
-                .post(host_info)
-                .put(host_info)
-                .delete(host_info)
-                .head(host_info)
-                .options(host_info)
-                .patch(host_info)
-            )
-            .push(
-                Router::new()
-                    .path("<*path>")
-                    .get(host_info)
-                    .post(host_info)
-                    .put(host_info)
-                    .delete(host_info)
-                    .head(host_info)
-                    .options(host_info)
-                    .patch(host_info),
-            );
+        // 根据 distr.conf 中配置的 server_name -> root 映射，动态选择 StaticDir
+        // 构建 host -> StaticDir 映射（仅支持常见匹配：精确、以 '.' 开头的后缀和以 '*.' 前缀）
+        let mut sd_map: std::collections::HashMap<String, std::sync::Arc<StaticDir>> = HashMap::new();
+        if let Some(m) = SERVERS.get() {
+            for (name, info) in m.iter() {
+                if let Some(root) = &info.root {
+                    // create StaticDir for configured root (StaticDir will return 404 if path missing)
+                    sd_map.insert(
+                        name.clone(),
+                        std::sync::Arc::new(
+                            StaticDir::new([root.as_str()]).defaults("index.html"),
+                        ),
+                    );
+                }
+            }
+        }
+        // 默认 fallback（开发时方便）：本地 ./static
+        let default_sd = std::sync::Arc::new(StaticDir::new(["static"]).defaults("index.html").auto_list(true));
+
+        // Host-aware handler that delegates to the right StaticDir
+        struct HostStatic {
+            map: std::collections::HashMap<String, std::sync::Arc<StaticDir>>,
+            default: std::sync::Arc<StaticDir>,
+        }
+        #[async_trait]
+        impl Handler for HostStatic {
+            async fn handle(&self, req: &mut Request, depot: &mut Depot, res: &mut Response, ctrl: &mut FlowCtrl) {
+                // extract host (strip optional port)
+                let host = req
+                    .headers()
+                    .get("host")
+                    .and_then(|v| v.to_str().ok())
+                    .unwrap_or("");
+                let host = host.split(':').next().unwrap_or("");
+
+                // exact match
+                if let Some(sd) = self.map.get(host) {
+                    sd.handle(req, depot, res, ctrl).await;
+                    return;
+                }
+
+                // suffix/prefix/wildcard matches (common nginx forms stored in map as e.g. ".example.com" or "*.example.com")
+                for (k, sd) in &self.map {
+                    if k.starts_with("*.") {
+                        if let Some(suf) = k.strip_prefix("*.") {
+                            if host.ends_with(suf) {
+                                sd.handle(req, depot, res, ctrl).await;
+                                return;
+                            }
+                        }
+                    } else if k.starts_with('.') {
+                        // ".example.com" (suffix)
+                        if host.ends_with(&k[1..]) {
+                            sd.handle(req, depot, res, ctrl).await;
+                            return;
+                        }
+                    } else if k.ends_with(".*") {
+                        // "example.*" (prefix)
+                        if let Some(pref) = k.strip_suffix(".*") {
+                            if host.starts_with(pref) {
+                                sd.handle(req, depot, res, ctrl).await;
+                                return;
+                            }
+                        }
+                    }
+                }
+
+                // configured default_server (match by DEFAULT_SERVER) if present
+                if let Some(def) = DEFAULT_SERVER.get() {
+                    if let Some(sd) = self.map.get(def) {
+                        sd.handle(req, depot, res, ctrl).await;
+                        return;
+                    }
+                }
+
+                // fallback to local ./static
+                self.default.handle(req, depot, res, ctrl).await;
+            }
+        }
+
+        let host_static = HostStatic { map: sd_map, default: default_sd };
+        let router = Router::with_path("{**path}").goal(host_static);
 
         let task = tokio::spawn(async move {
             if p == 443 {
@@ -546,10 +593,10 @@ async fn main() {
                     }
                 }
                 let acc = b.bind().await;
-                let _ = Server::new(acc).serve(r).await;
+                let _ = Server::new(acc).serve(router).await;
             } else {
                 let acc = TcpListener::new(format!("0.0.0.0:{}", p)).bind().await;
-                let _ = Server::new(acc).serve(r).await;
+                let _ = Server::new(acc).serve(router).await;
             }
         });
         tasks.push(task);
